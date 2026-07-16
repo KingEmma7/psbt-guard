@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = ["crates/psbt-guard-core", "crates/psbt-guard-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+# Floor set by clap 4.5; bitcoin 0.32 itself only needs 1.60.
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+authors = ["psbt-guard contributors"]
+description = "Offline, read-only PSBT intent verifier: checks a PSBT against a user-declared payment intent before signing"
+keywords = ["bitcoin", "psbt", "security", "cli"]
+categories = ["command-line-utilities", "cryptography::cryptocurrencies"]
+
+[workspace.dependencies]
+psbt-guard-core = { path = "crates/psbt-guard-core" }
+bitcoin = { version = "0.32", features = ["base64", "serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+thiserror = "1"
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1"
+assert_cmd = "2"
+predicates = "3"

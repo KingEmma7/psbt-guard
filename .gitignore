@@ -1,0 +1,13 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+
+# OS / editor noise
+.DS_Store
+
+# Local AI / IDE agent instructions (not part of the published project)
+.cursor/
+.cursorrules
+CLAUDE.md
+.claude/
+AGENTS.md
