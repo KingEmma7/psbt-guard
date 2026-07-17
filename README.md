@@ -5,8 +5,8 @@ Signed Bitcoin Transaction (PSBT, [BIP 174]) matches a payment intent you declar
 recipients, amounts, fee limits — and highlights conditions that deserve review
 *before* you sign.
 
-> **Status: early scaffold (milestone M0).** The command surface and project structure
-> exist; PSBT analysis is under active development. See [`PLAN.md`](PLAN.md).
+> **Status: milestone M1.** `inspect` loads PSBTs and reports structural findings
+> PG101-PG105; intent verification is planned for M2. See [`PLAN.md`](PLAN.md).
 
 ## Why not just `decodepsbt`?
 
@@ -29,7 +29,7 @@ It operates entirely on PSBT data, public wallet information and your declared i
 Its verdict is **advisory review guidance — not a guarantee of safety**. A clean report
 means none of its rules fired, nothing more.
 
-## Usage (target CLI)
+## Usage
 
 ```bash
 psbt-guard inspect <PSBT>                      # structural findings, no intent needed
@@ -37,8 +37,9 @@ psbt-guard verify <PSBT> --intent intent.toml  # verify against declared intent
 psbt-guard explain PG301                       # explain a finding code
 ```
 
-`<PSBT>` may be a file path, a base64 string, or `-` for stdin. Add `--format json`
-for machine-readable output. Intent manifests are TOML (primary) or JSON — see
+`<PSBT>` may be a file path, a base64 string, or `-` for stdin. For `inspect`, add
+`--format json` for machine-readable output. `verify` and `explain` are still
+milestone stubs. Intent manifests are TOML (primary) or JSON — see
 [`examples/intent.toml`](examples/intent.toml).
 
 ### Exit codes

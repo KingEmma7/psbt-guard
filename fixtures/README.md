@@ -12,7 +12,7 @@ Every fixture must come from one of these sources, recorded next to the file:
    data (testnet/regtest scripts, well-known example xpubs).
 3. **Other public specifications** — e.g. BIP 370/371 vectors, with a citation.
 
-## Layout (populated from M1 onward)
+## Layout
 
 ```
 fixtures/
@@ -23,3 +23,11 @@ fixtures/
 
 Each fixture gets a sibling `<name>.md` (or a manifest entry) stating: source,
 network, what it demonstrates, and which rule codes it exercises.
+
+Current M1 fixtures:
+
+- `fixtures/valid/bip174-valid.base64` — public BIP 174 valid PSBT vector used for
+  parser coverage.
+
+Rule-triggering PG101-PG105 cases are constructed directly in unit tests from public
+dummy transactions. They contain no private keys and are never signed or broadcast.

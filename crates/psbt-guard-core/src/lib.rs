@@ -12,10 +12,48 @@
 //! and intent data and produces typed values ([`report::AnalysisReport`],
 //! [`model::Finding`]) that callers render however they wish.
 //!
-//! Status: milestone M0 (scaffold). The module skeleton below is real; the
-//! analysis pipeline lands in M1/M2 — see `PLAN.md` at the repository root.
+//! Status: milestone M1. The crate can parse PSBTs and run structural rules
+//! that do not need a user intent manifest.
 
 pub mod intent;
 pub mod model;
+pub mod parse;
 pub mod report;
 pub mod rules;
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    use bitcoin::absolute;
+    use bitcoin::transaction;
+    use bitcoin::{Amount, OutPoint, Psbt, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness};
+
+    pub(crate) const VALID_PSBT_BASE64: &str = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAAAA";
+
+    pub(crate) fn minimal_psbt() -> Psbt {
+        let unsigned_tx = Transaction {
+            version: transaction::Version::TWO,
+            lock_time: absolute::LockTime::ZERO,
+            input: vec![TxIn {
+                previous_output: OutPoint::null(),
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::MAX,
+                witness: Witness::default(),
+            }],
+            output: vec![TxOut {
+                value: Amount::from_sat(10_000),
+                script_pubkey: ScriptBuf::new(),
+            }],
+        };
+
+        Psbt::from_unsigned_tx(unsigned_tx).expect("minimal unsigned transaction is valid")
+    }
+
+    pub(crate) fn minimal_psbt_with_witness_utxo() -> Psbt {
+        let mut psbt = minimal_psbt();
+        psbt.inputs[0].witness_utxo = Some(TxOut {
+            value: Amount::from_sat(20_000),
+            script_pubkey: ScriptBuf::new(),
+        });
+        psbt
+    }
+}

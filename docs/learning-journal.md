@@ -75,3 +75,53 @@ A PSBT input may carry `non_witness_utxo` (the whole previous transaction) or
 amount being spent — and therefore cannot compute the fee (fee = inputs − outputs is
 implicit, never stated in the transaction). Some historical hardware-wallet attacks
 exploited exactly this gap.
+
+## M1 — PSBT loading and structural rules
+
+### `Result<Psbt, ParseError>` (`crates/psbt-guard-core/src/parse.rs`)
+
+Rust's `Result<T, E>` is a box that says "this either worked and contains `T`, or it
+failed and contains `E`." PSBT input is adversarial, so malformed bytes must become a
+normal `ParseError`, not a panic. We wrap `bitcoin::Psbt::deserialize` and
+`bitcoin::Psbt::from_str` so callers can distinguish binary parse failures from
+base64 parse failures. *Alternative not chosen*: calling `.unwrap()` after parsing —
+shorter, but it would crash on bad input and violate the threat model.
+
+### `AnalysisContext` as a shared read-only table (`crates/psbt-guard-core/src/model.rs`)
+
+`AnalysisContext` currently holds the parsed `bitcoin::Psbt`. Think of it like placing
+the PSBT on a table where every rule can inspect it but nobody can scribble on it.
+This gives M2 a natural place to add intent data and derived facts without changing
+every rule signature. *Alternative not chosen*: passing `&Psbt` directly to every rule
+— simpler for M1, but it would force churn when intent-aware rules arrive.
+
+### Trait objects for rules (`crates/psbt-guard-core/src/rules/mod.rs`)
+
+`AnalysisRule` is a trait: any type that implements `code`, `name`, and `evaluate`
+counts as a rule. `Box<dyn AnalysisRule>` lets one registry vector hold different rule
+structs in a fixed order. *Alternative not chosen*: one big `match` over an enum of all
+rules — workable, but every new rule would require editing central dispatch code.
+
+### PSBT unknown and proprietary maps (`rules/unknown_fields.rs`, `rules/proprietary_fields.rs`)
+
+BIP 174 is extensible. `unknown` fields are fields the library does not understand;
+`proprietary` fields are explicitly reserved for application-specific metadata. Both
+can be legitimate, but psbt-guard cannot explain their meaning, so PG102 and PG103
+surface them as warnings. *Alternative not chosen*: treating them as critical — too
+strong, because wallet metadata can be harmless.
+
+### Sighash modes (`crates/psbt-guard-core/src/rules/sighash.rs`)
+
+A sighash mode describes which parts of the transaction a signature commits to. The
+default modes are like signing the full form; non-default modes can deliberately leave
+parts replaceable. PG104 allows absent/default values and flags explicit non-default
+values as critical. *Alternative not chosen*: only rejecting invalid sighash values —
+that would miss valid-but-risky modes such as `SIGHASH_SINGLE`.
+
+### CLI fallback from binary bytes to base64 text (`crates/psbt-guard-cli/src/main.rs`)
+
+When the CLI reads a file or stdin, it first tries binary PSBT bytes and then tries
+base64 text if the bytes are valid UTF-8. This keeps core pure while making the CLI
+friendlier for common PSBT transfer formats. *Alternative not chosen*: requiring a
+separate `--base64` flag — explicit, but unnecessary friction for M1's target input
+surface.
