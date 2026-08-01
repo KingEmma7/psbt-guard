@@ -43,11 +43,17 @@ fn minimal_psbt() -> Psbt {
     Psbt::from_unsigned_tx(unsigned_tx).expect("minimal unsigned transaction is valid")
 }
 
+fn segwit_script() -> ScriptBuf {
+    let mut bytes = vec![0x00, 0x14];
+    bytes.extend([0_u8; 20]);
+    ScriptBuf::from_bytes(bytes)
+}
+
 fn minimal_psbt_base64_with_witness_utxo() -> String {
     let mut psbt = minimal_psbt();
     psbt.inputs[0].witness_utxo = Some(TxOut {
         value: Amount::from_sat(20_000),
-        script_pubkey: ScriptBuf::new(),
+        script_pubkey: segwit_script(),
     });
     psbt.to_string()
 }
@@ -83,7 +89,7 @@ fn verification_psbt_base64(recipient_amount_sat: u64, change_amount_sat: u64) -
     let mut psbt = Psbt::from_unsigned_tx(unsigned_tx).expect("valid unsigned transaction");
     psbt.inputs[0].witness_utxo = Some(TxOut {
         value: Amount::from_sat(100_000),
-        script_pubkey: ScriptBuf::new(),
+        script_pubkey: segwit_script(),
     });
     psbt.to_string()
 }
@@ -204,7 +210,7 @@ fn inspect_critical_sighash_exits_1() {
     let mut psbt = minimal_psbt();
     psbt.inputs[0].witness_utxo = Some(TxOut {
         value: Amount::from_sat(20_000),
-        script_pubkey: ScriptBuf::new(),
+        script_pubkey: segwit_script(),
     });
     psbt.inputs[0].sighash_type = Some(PsbtSighashType::from_u32(2));
 

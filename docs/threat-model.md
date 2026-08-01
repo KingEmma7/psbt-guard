@@ -12,6 +12,7 @@ airgap transfer). Concrete threats the rules target:
 - Fee siphoning (absurd fee, deliberately or by bug).
 - Sighash downgrade (non-default sighash allowing post-signature modification).
 - Information withholding (missing UTXO data preventing informed review).
+- Funding-data substitution (conflicting UTXO fields that conceal the real fee).
 
 M2 maps those threats to stable findings:
 
@@ -53,3 +54,6 @@ M2 maps those threats to stable findings:
   the tool does not guess which one is change.
 - Amount accumulation uses checked arithmetic and malformed value balance is never
   treated as a normal fee.
+- Fee accounting validates every supplied previous transaction, reconciles it with
+  `witness_utxo` when both are present, and rejects witness-only data for legacy
+  outputs.

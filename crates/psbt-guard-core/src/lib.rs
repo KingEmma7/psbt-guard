@@ -52,9 +52,11 @@ pub(crate) mod test_support {
 
     pub(crate) fn minimal_psbt_with_witness_utxo() -> Psbt {
         let mut psbt = minimal_psbt();
+        let mut script_bytes = vec![0x00, 0x14];
+        script_bytes.extend([0_u8; 20]);
         psbt.inputs[0].witness_utxo = Some(TxOut {
             value: Amount::from_sat(20_000),
-            script_pubkey: ScriptBuf::new(),
+            script_pubkey: ScriptBuf::from_bytes(script_bytes),
         });
         psbt
     }

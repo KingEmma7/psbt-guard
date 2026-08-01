@@ -19,6 +19,12 @@ pub(crate) enum FeeCalculationError {
     MismatchedNonWitnessUtxo {
         input_index: usize,
     },
+    InconsistentUtxoData {
+        input_index: usize,
+    },
+    WitnessUtxoForLegacyInput {
+        input_index: usize,
+    },
     InvalidPreviousOutput {
         input_index: usize,
         vout: u32,
@@ -40,6 +46,14 @@ impl std::fmt::Display for FeeCalculationError {
                 f,
                 "input #{input_index} non_witness_utxo txid does not match its previous output"
             ),
+            Self::InconsistentUtxoData { input_index } => write!(
+                f,
+                "input #{input_index} witness_utxo does not match the referenced non_witness_utxo output"
+            ),
+            Self::WitnessUtxoForLegacyInput { input_index } => write!(
+                f,
+                "input #{input_index} provides only witness_utxo data for a non-SegWit previous output"
+            ),
             Self::InvalidPreviousOutput { input_index, vout } => write!(
                 f,
                 "input #{input_index} references missing non_witness_utxo output #{vout}"
@@ -56,6 +70,21 @@ impl std::fmt::Display for FeeCalculationError {
     }
 }
 
+fn is_segwit_funding_output(psbt_input: &bitcoin::psbt::Input, output: &bitcoin::TxOut) -> bool {
+    if output.script_pubkey.is_witness_program() {
+        return true;
+    }
+
+    output.script_pubkey.is_p2sh()
+        && psbt_input
+            .redeem_script
+            .as_ref()
+            .is_some_and(|redeem_script| {
+                redeem_script.is_witness_program()
+                    && redeem_script.to_p2sh() == output.script_pubkey
+            })
+}
+
 pub(crate) fn calculate_absolute_fee(
     ctx: &AnalysisContext,
 ) -> Result<AbsoluteFee, FeeCalculationError> {
@@ -69,23 +98,42 @@ pub(crate) fn calculate_absolute_fee(
         .zip(psbt.inputs.iter())
         .enumerate()
     {
-        let value_sat = if let Some(output) = &psbt_input.witness_utxo {
-            output.value.to_sat()
-        } else if let Some(transaction) = &psbt_input.non_witness_utxo {
+        let non_witness_output = if let Some(transaction) = &psbt_input.non_witness_utxo {
             if transaction.compute_txid() != tx_input.previous_output.txid {
                 return Err(FeeCalculationError::MismatchedNonWitnessUtxo { input_index });
             }
-            transaction
-                .output
-                .get(tx_input.previous_output.vout as usize)
-                .ok_or(FeeCalculationError::InvalidPreviousOutput {
-                    input_index,
-                    vout: tx_input.previous_output.vout,
-                })?
-                .value
-                .to_sat()
+            Some(
+                transaction
+                    .output
+                    .get(tx_input.previous_output.vout as usize)
+                    .ok_or(FeeCalculationError::InvalidPreviousOutput {
+                        input_index,
+                        vout: tx_input.previous_output.vout,
+                    })?,
+            )
         } else {
-            return Err(FeeCalculationError::MissingUtxo { input_index });
+            None
+        };
+
+        let value_sat = match (&psbt_input.witness_utxo, non_witness_output) {
+            (Some(witness_output), Some(previous_output)) => {
+                if witness_output != previous_output {
+                    return Err(FeeCalculationError::InconsistentUtxoData { input_index });
+                }
+                previous_output.value.to_sat()
+            }
+            (None, Some(previous_output)) => previous_output.value.to_sat(),
+            (Some(witness_output), None)
+                if is_segwit_funding_output(psbt_input, witness_output) =>
+            {
+                witness_output.value.to_sat()
+            }
+            (Some(_), None) => {
+                return Err(FeeCalculationError::WitnessUtxoForLegacyInput { input_index });
+            }
+            (None, None) => {
+                return Err(FeeCalculationError::MissingUtxo { input_index });
+            }
         };
 
         input_total_sat = input_total_sat

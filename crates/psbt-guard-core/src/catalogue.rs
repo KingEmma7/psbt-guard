@@ -66,7 +66,7 @@ pub fn explanation(code: FindingCode) -> RuleExplanation {
             code,
             name: "Absolute fee calculation",
             typical_severity: Severity::Info,
-            what_it_checks: "Funding input totals minus transaction output totals using complete, matching UTXO data.",
+            what_it_checks: "Funding input totals minus transaction output totals, reconciling both UTXO fields and rejecting witness-only legacy funding data.",
             why_it_matters: "The fee is implicit and must be calculated before it can be reviewed against policy.",
             suggested_action: "Compare the calculated fee with the declared ceiling and expected transaction size.",
         },

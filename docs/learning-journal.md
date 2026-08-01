@@ -152,7 +152,10 @@ PG201 reports absolute fee accounting, including why it could not be completed. 
 then treats an unevaluable fee ceiling as a violation: a max-fee policy is not satisfied
 merely because the tool lacks enough UTXO data to calculate the fee. For
 `non_witness_utxo`, the transaction ID and referenced output index are checked before its
-value is trusted.
+value is trusted. If both UTXO fields are supplied, their referenced outputs must match;
+if only `witness_utxo` is supplied, the previous output must be native SegWit or a
+correctly wrapped SegWit program. This prevents forged witness values from understating
+the fee for legacy inputs.
 
 ### Count-based change is deliberately limited
 

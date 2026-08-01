@@ -108,7 +108,9 @@ Entry template for implemented rules:
   inconsistent; Critical when outputs exceed inputs.
 - **What it checks**: Sums every funding UTXO and transaction output, then reports the
   absolute fee. A `non_witness_utxo` must match the referenced transaction ID and
-  output index.
+  output index. When both UTXO fields are present, their referenced outputs must
+  match exactly. A witness-only input is accepted only for a native or correctly
+  wrapped SegWit previous output.
 - **Why it matters**: Reliable fee review is impossible without independently
   accounting for every input value.
 - **Evidence**: Input total, output total and fee in satoshis, or the deterministic
