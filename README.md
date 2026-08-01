@@ -5,8 +5,11 @@ Signed Bitcoin Transaction (PSBT, [BIP 174]) matches a payment intent you declar
 recipients, amounts, fee limits — and highlights conditions that deserve review
 *before* you sign.
 
-> **Status: milestone M1.** `inspect` loads PSBTs and reports structural findings
-> PG101-PG105; intent verification is planned for M2. See [`PLAN.md`](PLAN.md).
+> **Status: MVP complete through milestone M3.** `inspect` reports structural findings PG101-PG105;
+> `verify` validates TOML/JSON intent manifests and runs absolute-fee, recipient,
+> amount, undeclared-output and fee-ceiling rules PG201 and PG301-PG304; `explain`
+> provides the stable catalogue entry for every implemented code. See
+> [`PLAN.md`](PLAN.md).
 
 ## Why not just `decodepsbt`?
 
@@ -37,10 +40,18 @@ psbt-guard verify <PSBT> --intent intent.toml  # verify against declared intent
 psbt-guard explain PG301                       # explain a finding code
 ```
 
-`<PSBT>` may be a file path, a base64 string, or `-` for stdin. For `inspect`, add
-`--format json` for machine-readable output. `verify` and `explain` are still
-milestone stubs. Intent manifests are TOML (primary) or JSON — see
-[`examples/intent.toml`](examples/intent.toml).
+`<PSBT>` may be a file path, a base64 string, or `-` for stdin. Add `--format json`
+to `inspect` or `verify` for deterministic machine-readable output. Intent manifests
+are TOML (primary) or JSON selected by the `.json` extension — see
+[`examples/intent.toml`](examples/intent.toml). Finding codes are case-insensitive
+when passed to `explain`.
+
+### M2 change-policy boundary
+
+M2 can allow a declared *count* of outputs that are not recipients as change
+candidates. It cannot prove those outputs return to your wallet. Keep
+`max_change_outputs` as low as possible and independently review every output;
+descriptor-based change ownership verification is planned for M4.
 
 ### Exit codes
 

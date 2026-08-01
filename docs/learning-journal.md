@@ -125,3 +125,49 @@ base64 text if the bytes are valid UTF-8. This keeps core pure while making the 
 friendlier for common PSBT transfer formats. *Alternative not chosen*: requiring a
 separate `--base64` flag — explicit, but unnecessary friction for M1's target input
 surface.
+
+## M2 — Intent verification and fee-policy failure posture
+
+### Validate manifests before analysis
+
+The intent manifest is security-sensitive configuration, not loose application input.
+M2 therefore rejects unknown fields, unsupported network names, wrong-network
+addresses, duplicate recipients, zero-value recipients and tolerances larger than the
+declared amount. Silently accepting a misspelled fee field would be more dangerous than
+rejecting the whole manifest.
+
+Recipient addresses are parsed once and converted to checked-network Bitcoin address
+types. Rules compare output scripts rather than display strings, avoiding ambiguity
+between equivalent textual forms.
+
+### Match recipient amounts in aggregate
+
+A transaction can contain more than one output paying the same script. PG302 sums every
+matching output with checked arithmetic, then applies the declared tolerance once to the
+aggregate. This avoids both false positives for split payments and accidental overflow.
+
+### Fee calculation must fail closed for policy
+
+PG201 reports absolute fee accounting, including why it could not be completed. PG304
+then treats an unevaluable fee ceiling as a violation: a max-fee policy is not satisfied
+merely because the tool lacks enough UTXO data to calculate the fee. For
+`non_witness_utxo`, the transaction ID and referenced output index are checked before its
+value is trusted.
+
+### Count-based change is deliberately limited
+
+M2's `max_change_outputs` is an allowance, not ownership proof. If the count is exceeded,
+PG303 reports every undeclared output instead of guessing which one is legitimate
+change. Descriptor-derived ownership is reserved for M4 and documented as a visible
+safety boundary in the README and threat model.
+
+## M3 — One catalogue, three input modes
+
+The `explain` command is backed by typed core data rather than a second CLI-only list of
+messages. `FindingCode` owns strict, case-insensitive parsing; the catalogue maps every
+implemented code to its normal severity, check, threat and suggested action. Tests walk
+all codes so a future rule cannot silently ship without an explanation.
+
+CLI integration tests now execute every documented PSBT input path: direct base64, a
+file, and stdin. The same loader first tries binary PSBT bytes and then UTF-8 base64,
+keeping the ergonomic behaviour observable at the process boundary.

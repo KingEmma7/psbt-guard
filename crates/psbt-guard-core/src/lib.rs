@@ -12,9 +12,11 @@
 //! and intent data and produces typed values ([`report::AnalysisReport`],
 //! [`model::Finding`]) that callers render however they wish.
 //!
-//! Status: milestone M1. The crate can parse PSBTs and run structural rules
-//! that do not need a user intent manifest.
+//! Status: MVP complete through milestone M3. The crate can run structural
+//! inspection, verify a PSBT against validated recipient, amount, change-count
+//! and fee policies, and explain every stable finding code.
 
+pub mod catalogue;
 pub mod intent;
 pub mod model;
 pub mod parse;
