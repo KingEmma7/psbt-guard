@@ -182,5 +182,7 @@ pub trait AnalysisRule {
 | M4 | Descriptor-based change verification | change outputs matched against wallet descriptors |
 | M5 | Fee-rate estimation and fee-rate policy | weight-based fee-rate findings |
 
-Current status: **M1 complete**; PSBT loading and structural `inspect` rules
-PG101-PG105 are implemented. M2 intent verification is next.
+Current status: **MVP complete through M3**; validated TOML/JSON intent manifests,
+end-to-end `verify` rules PG201 and PG301-PG304, all documented PSBT input modes, and
+the stable `explain` catalogue command are implemented alongside structural rules
+PG101-PG105. Descriptor-based change verification is next in M4.

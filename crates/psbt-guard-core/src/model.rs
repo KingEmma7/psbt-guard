@@ -2,6 +2,9 @@
 
 use bitcoin::Psbt;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+use crate::intent::Intent;
 
 /// How much attention a finding deserves before signing.
 ///
@@ -45,6 +48,21 @@ pub enum FindingCode {
     /// Input finalization or partial-signature status.
     #[serde(rename = "PG105")]
     Pg105,
+    /// Absolute fee calculation.
+    #[serde(rename = "PG201")]
+    Pg201,
+    /// Declared recipient address missing from the transaction.
+    #[serde(rename = "PG301")]
+    Pg301,
+    /// Recipient amount mismatch.
+    #[serde(rename = "PG302")]
+    Pg302,
+    /// Output not assigned to a declared recipient or allowed change count.
+    #[serde(rename = "PG303")]
+    Pg303,
+    /// Maximum absolute fee policy violation.
+    #[serde(rename = "PG304")]
+    Pg304,
 }
 
 impl FindingCode {
@@ -56,6 +74,11 @@ impl FindingCode {
             FindingCode::Pg103 => "PG103",
             FindingCode::Pg104 => "PG104",
             FindingCode::Pg105 => "PG105",
+            FindingCode::Pg201 => "PG201",
+            FindingCode::Pg301 => "PG301",
+            FindingCode::Pg302 => "PG302",
+            FindingCode::Pg303 => "PG303",
+            FindingCode::Pg304 => "PG304",
         }
     }
 }
@@ -63,6 +86,31 @@ impl FindingCode {
 impl std::fmt::Display for FindingCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+/// Error returned when a finding-code string is not in the stable catalogue.
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[error("unknown finding code `{0}`; expected PG101-PG105, PG201 or PG301-PG304")]
+pub struct FindingCodeParseError(String);
+
+impl std::str::FromStr for FindingCode {
+    type Err = FindingCodeParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_uppercase().as_str() {
+            "PG101" => Ok(Self::Pg101),
+            "PG102" => Ok(Self::Pg102),
+            "PG103" => Ok(Self::Pg103),
+            "PG104" => Ok(Self::Pg104),
+            "PG105" => Ok(Self::Pg105),
+            "PG201" => Ok(Self::Pg201),
+            "PG301" => Ok(Self::Pg301),
+            "PG302" => Ok(Self::Pg302),
+            "PG303" => Ok(Self::Pg303),
+            "PG304" => Ok(Self::Pg304),
+            _ => Err(FindingCodeParseError(value.to_owned())),
+        }
     }
 }
 
@@ -152,22 +200,38 @@ pub struct Finding {
 /// Parsed PSBT plus any shared derived facts rules need.
 pub struct AnalysisContext {
     psbt: Psbt,
+    intent: Option<Intent>,
 }
 
 impl AnalysisContext {
     /// Build a read-only analysis context from a parsed PSBT.
     pub fn from_psbt(psbt: Psbt) -> Self {
-        Self { psbt }
+        Self { psbt, intent: None }
+    }
+
+    /// Build a context for full intent verification.
+    pub fn with_intent(psbt: Psbt, intent: Intent) -> Self {
+        Self {
+            psbt,
+            intent: Some(intent),
+        }
     }
 
     /// The parsed PSBT under review.
     pub fn psbt(&self) -> &Psbt {
         &self.psbt
     }
+
+    /// Validated intent, when the caller requested full verification.
+    pub fn intent(&self) -> Option<&Intent> {
+        self.intent.as_ref()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::{Evidence, EvidenceScope, FindingCode, Severity};
 
     #[test]
@@ -195,6 +259,15 @@ mod tests {
     fn finding_code_serializes_as_stable_catalogue_code() {
         let json = serde_json::to_string(&FindingCode::Pg101).expect("serialize");
         assert_eq!(json, "\"PG101\"");
+    }
+
+    #[test]
+    fn finding_code_parsing_is_case_insensitive_but_strict() {
+        assert_eq!(
+            FindingCode::from_str("pg304").expect("known code"),
+            FindingCode::Pg304
+        );
+        assert!(FindingCode::from_str("PG999").is_err());
     }
 
     #[test]

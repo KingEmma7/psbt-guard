@@ -2,16 +2,18 @@
 
 use std::fs;
 use std::io::{self, Read};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-use psbt_guard_core::model::AnalysisContext;
-use psbt_guard_core::model::Finding;
+use psbt_guard_core::catalogue::explanation;
+use psbt_guard_core::intent::{parse_intent, IntentFormat};
+use psbt_guard_core::model::{AnalysisContext, Finding, FindingCode};
 use psbt_guard_core::parse::{parse_psbt_base64, parse_psbt_bytes};
 use psbt_guard_core::report::{analyze, AnalysisReport};
-use psbt_guard_core::rules::structural_registry;
+use psbt_guard_core::rules::{structural_registry, verification_registry};
 
 const AFTER_HELP: &str = "\
 Exit codes:
@@ -52,6 +54,9 @@ enum Command {
         /// Intent manifest (TOML primary; JSON accepted by extension)
         #[arg(long, value_name = "FILE")]
         intent: PathBuf,
+        /// Output format
+        #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
+        format: OutputFormat,
     },
     /// Explain a finding code from the rule catalogue
     Explain {
@@ -81,13 +86,12 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<ExitCode> {
     match cli.command {
         Command::Inspect { psbt, format } => inspect(&psbt, format),
-        Command::Verify { psbt, intent } => not_implemented(
-            "verify",
-            &format!("{}, intent {}", input_summary(&psbt), intent.display()),
-        ),
-        Command::Explain { finding_code } => {
-            not_implemented("explain", &format!("finding code {finding_code}"))
-        }
+        Command::Verify {
+            psbt,
+            intent,
+            format,
+        } => verify(&psbt, &intent, format),
+        Command::Explain { finding_code } => explain(&finding_code),
     }
 }
 
@@ -98,19 +102,33 @@ fn inspect(psbt_arg: &str, format: OutputFormat) -> Result<ExitCode> {
     let report = analyze(&ctx, &rules);
 
     match format {
-        OutputFormat::Text => print_text_report(&report),
-        OutputFormat::Json => {
-            let json = serde_json::to_string_pretty(&report)
-                .context("failed to serialize analysis report as JSON")?;
-            println!("{json}");
-        }
+        OutputFormat::Text => print_text_report("inspect", "no structural findings", &report),
+        OutputFormat::Json => print_json_report(&report)?,
     }
 
-    if report.has_blocking_findings {
-        Ok(ExitCode::from(1))
-    } else {
-        Ok(ExitCode::from(0))
+    Ok(report_exit_code(&report))
+}
+
+fn verify(psbt_arg: &str, intent_path: &Path, format: OutputFormat) -> Result<ExitCode> {
+    let manifest = fs::read_to_string(intent_path)
+        .with_context(|| format!("failed to read intent file {}", intent_path.display()))?;
+    let intent_format = match intent_path.extension().and_then(|value| value.to_str()) {
+        Some(extension) if extension.eq_ignore_ascii_case("json") => IntentFormat::Json,
+        _ => IntentFormat::Toml,
+    };
+    let intent = parse_intent(&manifest, intent_format)
+        .with_context(|| format!("failed to parse intent file {}", intent_path.display()))?;
+    let psbt = load_psbt(psbt_arg)?;
+    let ctx = AnalysisContext::with_intent(psbt, intent);
+    let rules = verification_registry();
+    let report = analyze(&ctx, &rules);
+
+    match format {
+        OutputFormat::Text => print_text_report("verify", "no verification findings", &report),
+        OutputFormat::Json => print_json_report(&report)?,
     }
+
+    Ok(report_exit_code(&report))
 }
 
 fn load_psbt(psbt_arg: &str) -> Result<bitcoin::Psbt> {
@@ -146,8 +164,8 @@ fn parse_psbt_from_bytes_or_text(bytes: &[u8]) -> Result<bitcoin::Psbt> {
     }
 }
 
-fn print_text_report(report: &AnalysisReport) {
-    println!("psbt-guard inspect report");
+fn print_text_report(command: &str, clean_message: &str, report: &AnalysisReport) {
+    println!("psbt-guard {command} report");
     println!(
         "summary: {} finding(s): {} info, {} warning, {} violation, {} critical",
         report.summary.total,
@@ -159,13 +177,42 @@ fn print_text_report(report: &AnalysisReport) {
     println!("advisory: review guidance only, not a guarantee of safety");
 
     if report.findings.is_empty() {
-        println!("no structural findings");
+        println!("{clean_message}");
         return;
     }
 
     for finding in &report.findings {
         print_finding(finding);
     }
+}
+
+fn print_json_report(report: &AnalysisReport) -> Result<()> {
+    let json = serde_json::to_string_pretty(report)
+        .context("failed to serialize analysis report as JSON")?;
+    println!("{json}");
+    Ok(())
+}
+
+fn report_exit_code(report: &AnalysisReport) -> ExitCode {
+    if report.has_blocking_findings {
+        ExitCode::from(1)
+    } else {
+        ExitCode::from(0)
+    }
+}
+
+fn explain(finding_code: &str) -> Result<ExitCode> {
+    let code = FindingCode::from_str(finding_code)?;
+    let entry = explanation(code);
+
+    println!("{} — {}", entry.code, entry.name);
+    println!("typical severity: {:?}", entry.typical_severity);
+    println!("what it checks: {}", entry.what_it_checks);
+    println!("why it matters: {}", entry.why_it_matters);
+    println!("suggested action: {}", entry.suggested_action);
+    println!("advisory: review guidance only, not a guarantee of safety");
+
+    Ok(ExitCode::from(0))
 }
 
 fn print_finding(finding: &Finding) {
@@ -194,21 +241,4 @@ fn print_finding(finding: &Finding) {
     }
 
     println!("suggested action: {}", finding.suggested_action);
-}
-
-/// Describe the PSBT argument without echoing a potentially huge blob.
-fn input_summary(psbt_arg: &str) -> String {
-    if psbt_arg == "-" {
-        "PSBT from stdin".to_owned()
-    } else {
-        format!("PSBT argument of {} chars", psbt_arg.chars().count())
-    }
-}
-
-fn not_implemented(subcommand: &str, received: &str) -> Result<ExitCode> {
-    eprintln!(
-        "psbt-guard: `{subcommand}` is not implemented yet (planned for a later milestone); \
-received {received}. See PLAN.md for the milestone schedule."
-    );
-    Ok(ExitCode::from(2))
 }

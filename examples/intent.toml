@@ -1,8 +1,5 @@
 # Example payment-intent manifest for `psbt-guard verify <PSBT> --intent intent.toml`.
 #
-# DRAFT SCHEMA — the intent format is designed in milestone M2 and may change
-# until then. This file documents the intended shape; it is not parsed yet.
-#
 # TOML is the primary format; a `.json` file with the same structure is also accepted.
 
 # Network the transaction must belong to: "bitcoin", "testnet", "signet" or "regtest".
@@ -11,11 +8,11 @@ network = "testnet"
 # Every recipient you agreed to pay. Any output that matches neither a declared
 # recipient nor the change policy is reported as an undeclared output (PG303).
 [[recipients]]
-address = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx"
+address = "mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn"
 amount_sat = 150_000
 
 [[recipients]]
-address = "2N2eLNZfaZaW1cQEBP9DRPPmMkPYPS78fbF"
+address = "n2eMqTT929pb1RDNuqEnxdaLau1rxy3efi"
 amount_sat = 25_000
 # Optional per-recipient tolerance for amount mismatch (default 0).
 amount_tolerance_sat = 0
@@ -25,6 +22,6 @@ amount_tolerance_sat = 0
 max_absolute_fee_sat = 5_000
 
 [change_policy]
-# M2: how many undeclared outputs are tolerated as change.
+# How many undeclared outputs are tolerated as change candidates.
 # M4 will add descriptor-based verification that change really pays your wallet.
 max_change_outputs = 1

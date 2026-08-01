@@ -1,8 +1,8 @@
 # Examples
 
-- [`intent.toml`](intent.toml) — draft payment-intent manifest (schema lands in M2).
+- [`intent.toml`](intent.toml) — validated payment-intent manifest used by `verify`.
 
-## Intended CLI usage (target surface; analysis lands in M1/M2)
+## CLI usage
 
 ```bash
 # Structural review only — no intent needed
@@ -17,6 +17,9 @@ psbt-guard verify payment.psbt --intent intent.toml --format json
 # Look up a finding code from a report
 psbt-guard explain PG301
 ```
+
+`explain` accepts finding codes case-insensitively and returns exit code `2` for an
+unknown code.
 
 Exit codes: `0` no policy violations, `1` violations or critical findings,
 `2` malformed input or operational error.

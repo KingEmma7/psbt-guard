@@ -14,20 +14,29 @@ reimplementing analysis.
 ## Analysis pipeline
 
 ```text
-PSBT bytes/base64
-  -> parse_psbt_bytes / parse_psbt_base64
-  -> bitcoin::Psbt
+PSBT bytes/base64 + optional validated TOML/JSON intent
+  -> parse_psbt_bytes / parse_psbt_base64 + parse_intent
+  -> bitcoin::Psbt + optional Intent
   -> AnalysisContext
-  -> structural_registry()
+  -> structural_registry() or verification_registry()
   -> AnalysisReport
   -> CLI text or JSON output
 ```
 
 ## `inspect` vs `verify`
 
-M1 implements `inspect`: it runs structural rules PG101-PG105 and does not require an
-intent manifest. `verify` remains an M2 command; it will reuse the same
-`AnalysisContext` and report machinery with intent-aware rules added.
+`inspect` runs structural rules PG101-PG105 and does not require an intent manifest.
+`verify` attaches a validated intent to the same `AnalysisContext`, then runs the
+structural rules plus PG201 and PG301-PG304 in stable catalogue order.
+
+`explain` parses a case-insensitive `FindingCode` and reads a typed, core-owned
+catalogue entry. Keeping those explanations in the library prevents CLI prose from
+drifting away from stable codes and rule semantics.
+
+Intent parsing rejects unknown fields, unsupported networks, wrong-network addresses,
+zero-value or duplicate recipients, and tolerances larger than their expected amount.
+Fee policy enforcement becomes a violation when incomplete or inconsistent UTXO data
+prevents the ceiling from being checked.
 
 ## Determinism guarantees
 
